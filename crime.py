@@ -60,9 +60,9 @@ def normalize(df, cols):
 
 
 if __name__ == "__main__":
-    loc_train = "./train.csv"
-    loc_test = "./test.csv"
-    loc_submission = "submission.csv"
+    loc_train = "./data/train.csv"
+    loc_test = "./data/test.csv"
+    loc_submission = "./data/submission.csv"
 
     print("reading train data")
     df_train = pd.read_csv(loc_train)
