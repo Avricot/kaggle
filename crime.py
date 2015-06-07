@@ -1,3 +1,4 @@
+import scipy as sp
 import pandas as pd
 import numpy
 from sklearn import ensemble
@@ -37,6 +38,13 @@ def improveDate(df):
     # df['hour_of_day'] = df["Dates"].values - df["Dates"].values.astype('datetime64[M]') + 1
     normalize(df, ['year', 'day_of_year', 'day_of_week', 'hour_of_day', 'month'])
 
+def llfun(act, pred):
+    epsilon = 1e-15
+    pred = sp.maximum(epsilon, pred)
+    pred = sp.minimum(1-epsilon, pred)
+    ll = sum(act*sp.log(pred) + sp.subtract(1,act)*sp.log(sp.subtract(1,pred)))
+    ll = ll * -1.0/len(act)
+    return ll
 
 def improveAddress(df):
     print("improving address features")
@@ -58,64 +66,51 @@ def normalize(df, cols):
     for col in cols:
         df[col] = preprocessing.scale(df[col].astype(numpy.float64))
 
+def cleanData(df):
+    print("removing lines with incorrect gps values...")
+    return df[df['Y'] < 60]
 
 if __name__ == "__main__":
-    loc_train = "./data/train.csv"
-    loc_test = "./data/test.csv"
+    loc_train = "./data/train_small.csv"
+    loc_test = "./data/test_small.csv"
     loc_submission = "./data/submission.csv"
 
     print("reading train data")
     df_train = pd.read_csv(loc_train)
+    df_train = cleanData(df_train)
     improveDate(df_train)
     improveAddress(df_train)
-    print("label for category")
 
+    print("label for category")
     categoryLabel = preprocessing.LabelEncoder()
     categoryLabel.fit(df_train["Category"])
     df_train["Category"] = categoryLabel.transform(df_train["Category"])
 
-    # print("reading test data")
-    # df_test = pd.read_csv(loc_test)
-    # improveDate(df_test)
-    # improveAddress(df_test)
-
-    # descLabel = preprocessing.LabelEncoder()
-    # descLabel.fit(df_train["Descript"])
-    # df_train["Descript"] = preprocessing.scale(descLabel.transform(df_train["Descript"]).astype(numpy.float64))
-    #
-    # resolutionLabel = preprocessing.LabelEncoder()
-    # resolutionLabel.fit(df_train["Resolution"])
-    # df_train["Resolution"] = preprocessing.scale(resolutionLabel.transform(df_train["Resolution"]).astype(numpy.float64))
-
-
-
     feature_cols = [col for col in df_train.columns if
                     col not in ['Dates', 'Category', 'Descript', 'DayOfWeek', 'Address', 'Resolution']]
     X_train = df_train[feature_cols]
-    y = df_train['Category']
-    X_train, X_test, Y_train, Y_test = train_test_split(X_train, y, test_size=0.33, random_state=42)
+    y = df_train['Category'].values
+    print("y----------")
+    #X_train, X_test, Y_train, Y_test = train_test_split(X_train, y, test_size=0.33, random_state=42)
 
     # X_test = df_test[feature_cols]
     #
-    clf = ensemble.RandomForestClassifier(n_estimators=25, n_jobs=-1)
+    clf = ensemble.RandomForestClassifier(n_estimators=10, n_jobs=4)
     print("training data...")
-    clf.fit(X_train, Y_train)
+    clf.fit(X_train, y)
 
-    print("data trained, predict on cross validation data")
-    predicted = clf.predict(X_test)
-
-    # print(categoryLabel.classes_)
-    # print(predicted)
-    # print("-----------------------")
-    # print(Y_test)
-    # print("-----------------------")
-    # print(y)
-    # print("-----------------------")
-    print("prediction done, report stats:")
-    print(metrics.classification_report(Y_test, predicted, target_names=categoryLabel.classes_))
+    #print("data trained, predict on cross validation data")
+    #predicted = clf.predict(X_test)
+    # print("prediction done, report stats:")
+    # print(metrics.classification_report(Y_test, predicted, target_names=categoryLabel.classes_))
+    #print("log_loss:")
+    #clf_probs = clf.predict_proba(X_test)
+    #print(metrics.log_loss(Y_test, clf_probs))
     #
-    # with open(loc_submission, "w") as outfile:
-    # outfile.write("Id,Cover_Type\n")
+    with open(loc_submission, "w") as outfile:
+    header = ['ARSON','ASSAULT','BAD CHECKS','BRIBERY','BURGLARY','DISORDERLY CONDUCT','DRIVING UNDER THE INFLUENCE','DRUG/NARCOTIC','DRUNKENNESS','EMBEZZLEMENT','EXTORTION','FAMILY OFFENSES','FORGERY/COUNTERFEITING','FRAUD','GAMBLING','KIDNAPPING','LARCENY/THEFT','LIQUOR LAWS','LOITERING','MISSING PERSON','NON-CRIMINAL','OTHER OFFENSES','PORNOGRAPHY/OBSCENE MAT','PROSTITUTION','RECOVERED VEHICLE','ROBBERY','RUNAWAY','SECONDARY CODES','SEX OFFENSES FORCIBLE','SEX OFFENSES NON FORCIBLE','STOLEN PROPERTY','SUICIDE','SUSPICIOUS OCC','TREA','TRESPASS','VANDALISM','VEHICLE THEFT','WARRANTS','WEAPON LAWS']
+    outfile.write("Id"+', '.join(header))
+    
     # for e, val in enumerate(list(clf.predict(X_test))):
     #     outfile.write("%s,%s\n"%(test_ids[e],val))
 
